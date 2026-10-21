@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CircuitLens – AI Circuit & Component Analyzer</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: #151d30;
+      --card-border: #23304d;
+      --text: #e2e8f0;
+      --text-muted: #94a3b8;
+      --primary: #38bdf8;
+      --primary-hover: #0ea5e9;
+      --primary-bg: rgba(56, 189, 248, 0.12);
+      --warning: #f59e0b;
+      --warning-bg: rgba(245, 158, 11, 0.12);
+      --danger: #ef4444;
+      --danger-bg: rgba(239, 68, 68, 0.12);
+      --success: #10b981;
+      --success-bg: rgba(16, 185, 129, 0.12);
+      --radius: 12px;
+      --font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      line-height: 1.5;
+      padding: 1.5rem 1rem 3rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 860px;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    header { text-align: center; padding: 1rem 0; }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-bottom: 0.4rem;
+    }
+
+    .brand h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    header p { color: var(--text-muted); font-size: 0.98rem; }
+
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.3);
+    }
+
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin-bottom: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .controls-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    @media (max-width: 640px) {
+      .controls-grid { grid-template-columns: 1fr; }
+    }
+
+    label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 0.35rem;
+      display: block;
+    }
+
+    select, input[type="file"], button {
+      width: 100%;
+      padding: 0.75rem 0.9rem;
+      border-radius: 8px;
+      border: 1px solid var(--card-border);
+      background-color: #0d1424;
+      color: var(--text);
+      font-size: 0.95rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s, background-color 0.2s;
+    }
+
+    select:focus, input[type="file"]:focus { border-color: var(--primary); }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
+      color: #ffffff;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.85rem;
+    }
+
+    .btn-primary:hover:not(:disabled) { filter: brightness(1.1); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-secondary {
+      background-color: transparent;
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      cursor: pointer;
+      padding: 0.45rem 0.75rem;
+      border-radius: 6px;
+      width: auto;
+    }
+
+    .btn-secondary:hover { color: var(--text); border-color: var(--text-muted); }
+
+    .preview-wrapper {
+      margin-top: 1rem;
+      display: none;
+      text-align: center;
+      background: #090e1a;
+      border-radius: 8px;
+      border: 1px dashed var(--card-border);
+      padding: 0.75rem;
+    }
+
+    .preview-wrapper img {
+      max-width: 100%;
+      max-height: 340px;
+      border-radius: 6px;
+      object-fit: contain;
+    }
+
+    .status-box {
+      display: none;
+      padding: 1rem;
+      border-radius: 8px;
+      font-size: 0.92rem;
+      margin-top: 1rem;
+    }
+
+    .status-loading {
+      background: var(--primary-bg);
+      border: 1px solid var(--primary);
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .status-error {
+      background: var(--danger-bg);
+      border: 1px solid var(--danger);
+      color: #fca5a5;
+    }
+
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--primary);
+      border-bottom-color: transparent;
+      border-radius: 50%;
+      display: inline-block;
+      animation: rotation 1s linear infinite;
+    }
+
+    @keyframes rotation {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .results-area { display: none; flex-direction: column; gap: 1.25rem; }
+
+    .results-header-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.25rem;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.2rem 0.55rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+
+    .badge-high { background: var(--success-bg); color: var(--success); border: 1px solid var(--success); }
+    .badge-medium { background: var(--warning-bg); color: var(--warning); border: 1px solid var(--warning); }
+    .badge-low { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger); }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .summary-item {
+      background: #0d1424;
+      padding: 0.75rem;
+      border-radius: 8px;
+      border: 1px solid var(--card-border);
+    }
+
+    .summary-item .label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+    }
+
+    .summary-item .value {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #fff;
+      margin-top: 0.2rem;
+    }
+
+    .summary-text { color: var(--text); font-size: 0.95rem; line-height: 1.6; }
+
+    .table-responsive { overflow-x: auto; margin-top: 0.5rem; }
+
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem; }
+
+    th, td { padding: 0.65rem 0.75rem; border-bottom: 1px solid var(--card-border); }
+
+    th {
+      background: #0d1424;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.72rem;
+      letter-spacing: 0.05em;
+    }
+
+    tbody tr:hover { background-color: rgba(255, 255, 255, 0.02); }
+
+    .card-warning-style {
+      border-color: rgba(245, 158, 11, 0.4);
+      background: linear-gradient(180deg, rgba(245, 158, 11, 0.05) 0%, var(--card-bg) 100%);
+    }
+
+    .card-warning-style .card-title { color: var(--warning); }
+    .card-info-style { border-color: rgba(56, 189, 248, 0.3); }
+
+    ul.bullet-list {
+      list-style-position: inside;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      font-size: 0.92rem;
+      padding-left: 0.25rem;
+    }
+
+    ul.bullet-list li { color: var(--text); }
+
+    .empty-msg { color: var(--text-muted); font-style: italic; font-size: 0.88rem; }
+
+    footer {
+      margin-top: 2.5rem;
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      max-width: 600px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div class="brand">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+          <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+          <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+        </svg>
+        <h1>CircuitLens</h1>
+      </div>
+      <p>AI-assisted circuit analysis for components, schematics, and breadboards.</p>
+    </header>
+
+    <div class="card">
+      <div class="controls-grid">
+        <div>
+          <label for="inputType">Input Type</label>
+          <select id="inputType">
+            <option value="auto" selected>Auto-detect</option>
+            <option value="component">Single component</option>
+            <option value="schematic">Schematic / diagram</option>
+            <option value="breadboard">Breadboard / prototype</option>
+          </select>
+        </div>
+        <div>
+          <label for="fileInput">Photo or Diagram</label>
+          <input type="file" id="fileInput" accept="image/*" />
+        </div>
+      </div>
+
+      <button id="analyzeBtn" class="btn-primary" disabled>
+        Analyze Circuit
+      </button>
+
+      <div id="previewWrapper" class="preview-wrapper">
+        <img id="imagePreview" alt="Circuit preview" />
+      </div>
+
+      <div id="loadingStatus" class="status-box status-loading">
+        <span class="spinner"></span>
+        <span>Inspecting image with Gemma 4... This may take a few seconds.</span>
+      </div>
+      <div id="errorStatus" class="status-box status-error"></div>
+    </div>
+
+    <!-- Results Section -->
+    <div id="resultsArea" class="results-area">
+      <div class="results-header-actions">
+        <h2 style="font-size: 1.25rem;">Analysis Results</h2>
+        <button id="copyBtn" class="btn-secondary" title="Copy analysis to clipboard">📋 Copy Results</button>
+      </div>
+
+      <div class="card">
+        <div class="summary-grid">
+          <div class="summary-item">
+            <div class="label">Circuit / Device Type</div>
+            <div class="value" id="resCircuitType">-</div>
+          </div>
+          <div class="summary-item">
+            <div class="label">Detected Target</div>
+            <div class="value" id="resImageType" style="text-transform: capitalize;">-</div>
+          </div>
+          <div class="summary-item">
+            <div class="label">Overall Confidence</div>
+            <div class="value" id="resConfidenceBadge"></div>
+          </div>
+        </div>
+        <p class="summary-text" id="resSummary"></p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <span>📦</span> Components Identified
+        </div>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Component</th>
+                <th>Qty</th>
+                <th>Value / Marking</th>
+                <th>Role in Circuit</th>
+                <th>Confidence</th>
+              </tr>
+            </thead>
+            <tbody id="resComponentsBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <span>🔌</span> Wiring & Connections
+        </div>
+        <ul id="resConnectionsList" class="bullet-list"></ul>
+      </div>
+
+      <div class="card card-warning-style">
+        <div class="card-title">
+          <span>⚠️</span> Visible Problems & Hazards
+        </div>
+        <ul id="resProblemsList" class="bullet-list"></ul>
+      </div>
+
+      <div class="card card-info-style">
+        <div class="card-title">
+          <span>🔍</span> Please Verify By Hand
+        </div>
+        <ul id="resChecksList" class="bullet-list"></ul>
+      </div>
+    </div>
+
+    <footer>
+      Built with the open-weight Gemma 4 model through the Gemini API. AI can misread circuits, so always verify before powering anything.
+    </footer>
+  </div>
+
+  <script>
+    // The API key and model live on the server (see server.js). Nothing secret is in this file.
+
+    // DOM Elements
+    const fileInput = document.getElementById("fileInput");
+    const inputTypeSelect = document.getElementById("inputType");
+    const analyzeBtn = document.getElementById("analyzeBtn");
+    const previewWrapper = document.getElementById("previewWrapper");
+    const imagePreview = document.getElementById("imagePreview");
+    const loadingStatus = document.getElementById("loadingStatus");
+    const errorStatus = document.getElementById("errorStatus");
+    const resultsArea = document.getElementById("resultsArea");
+    const copyBtn = document.getElementById("copyBtn");
+
+    const resCircuitType = document.getElementById("resCircuitType");
+    const resImageType = document.getElementById("resImageType");
+    const resConfidenceBadge = document.getElementById("resConfidenceBadge");
+    const resSummary = document.getElementById("resSummary");
+    const resComponentsBody = document.getElementById("resComponentsBody");
+    const resConnectionsList = document.getElementById("resConnectionsList");
+    const resProblemsList = document.getElementById("resProblemsList");
+    const resChecksList = document.getElementById("resChecksList");
+
+    let currentBase64Image = null;
+    let lastAnalysisData = null;
+
+    function createConfidenceBadge(level) {
+      const span = document.createElement("span");
+      const normalized = (level || "medium").toLowerCase();
+      span.className = `badge ${
+        normalized === "high" ? "badge-high" : normalized === "low" ? "badge-low" : "badge-medium"
+      }`;
+      span.textContent = normalized;
+      return span;
+    }
+
+    // Downscale large images and flatten transparency onto white
+    function resizeImage(file, maxPx = 1600) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            let width = img.width;
+            let height = img.height;
+
+            if (width > maxPx || height > maxPx) {
+              if (width > height) {
+                height = Math.round((height * maxPx) / width);
+                width = maxPx;
+              } else {
+                width = Math.round((width * maxPx) / height);
+                height = maxPx;
+              }
+            }
+
+            const canvas = document.createElement("canvas");
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            // White background so transparent PNG diagrams don't turn black in the JPEG
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, width, height);
+            ctx.drawImage(img, 0, 0, width, height);
+
+            const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+            const base64Data = dataUrl.split(",")[1];
+            resolve({ dataUrl, base64Data });
+          };
+          img.onerror = reject;
+          img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    fileInput.addEventListener("change", async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+
+      errorStatus.style.display = "none";
+      try {
+        const { dataUrl, base64Data } = await resizeImage(file, 1600);
+        currentBase64Image = base64Data;
+        imagePreview.src = dataUrl;
+        previewWrapper.style.display = "block";
+        analyzeBtn.disabled = false;
+      } catch (err) {
+        showError("Failed to process image: " + (err && err.message ? err.message : "unsupported image"));
+      }
+    });
+
+    analyzeBtn.addEventListener("click", async () => {
+      if (!currentBase64Image) return;
+
+      loadingStatus.style.display = "flex";
+      errorStatus.style.display = "none";
+      resultsArea.style.display = "none";
+      analyzeBtn.disabled = true;
+
+      try {
+        const responseData = await callBackend(currentBase64Image, inputTypeSelect.value);
+        renderResults(responseData);
+      } catch (err) {
+        showError(err.message);
+      } finally {
+        loadingStatus.style.display = "none";
+        analyzeBtn.disabled = false;
+      }
+    });
+
+    // Try parsing a string into JSON with multiple sanitization passes
+    function tryParseJson(text) {
+      if (!text || typeof text !== "string") return null;
+
+      // Remove any thinking/reasoning tags
+      let cleaned = text
+        .replace(/<\|channel\>thought[\s\S]*?<channel\|>/gi, "")
+        .replace(/<thought>[\s\S]*?<\/thought>/gi, "")
+        .replace(/<think>[\s\S]*?<\/think>/gi, "")
+        .trim();
+
+      // Direct parse
+      try {
+        return JSON.parse(cleaned);
+      } catch (_) {}
+
+      // Markdown code block: ```json ... ```
+      const blockMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+      if (blockMatch && blockMatch[1]) {
+        try {
+          return JSON.parse(blockMatch[1].trim());
+        } catch (_) {
+          cleaned = blockMatch[1].trim();
+        }
+      }
+
+      // Outermost { ... } slice
+      const start = cleaned.indexOf("{");
+      const end = cleaned.lastIndexOf("}");
+      if (start !== -1 && end !== -1 && end > start) {
+        const jsonSlice = cleaned.substring(start, end + 1);
+        try {
+          return JSON.parse(jsonSlice);
+        } catch (_) {
+          // Remove trailing commas
+          const sanitized = jsonSlice.replace(/,\s*([}\]])/g, "$1");
+          try {
+            return JSON.parse(sanitized);
+          } catch (_) {}
+        }
+      }
+      return null;
+    }
+
+    // Safety net if the model returns bullet text instead of JSON
+    function buildFallbackFromText(rawText) {
+      const clean = rawText
+        .replace(/<\|channel\>thought[\s\S]*?<channel\|>/gi, "")
+        .replace(/<thought>[\s\S]*?<\/thought>/gi, "")
+        .replace(/<think>[\s\S]*?<\/think>/gi, "")
+        .trim();
+
+      const lines = clean.split("\n").map((l) => l.trim()).filter(Boolean);
+
+      const data = {
+        image_type: "unclear",
+        circuit_type: "Detected Circuit",
+        summary: clean.substring(0, 320) + (clean.length > 320 ? "..." : ""),
+        components: [],
+        connections: [],
+        possible_problems: [],
+        what_to_check: [
+          "⚠️ The model did not return structured data, so this result is approximate. Re-run the analysis.",
+          "Please inspect circuit manually against specifications."
+        ],
+        overall_confidence: "low"
+      };
+
+      lines.forEach((line) => {
+        const lower = line.toLowerCase();
+        if (lower.includes("schematic")) data.image_type = "schematic";
+        else if (lower.includes("breadboard")) data.image_type = "breadboard";
+        else if (lower.includes("component")) data.image_type = "component";
+
+        if (lower.startsWith("- ") || lower.startsWith("* ") || /^\d+\./.test(lower)) {
+          const item = line.replace(/^[-*\d.]+\s*/, "");
+          if (lower.includes("problem") || lower.includes("warning") || lower.includes("danger") || lower.includes("risk")) {
+            data.possible_problems.push(item);
+          } else if (lower.includes("connect") || lower.includes("pin") || lower.includes("wire") || lower.includes("rail")) {
+            data.connections.push(item);
+          } else if (lower.includes("check") || lower.includes("verify") || lower.includes("measure")) {
+            data.what_to_check.push(item);
+          } else {
+            data.components.push({
+              name: item.substring(0, 40),
+              quantity: 1,
+              value_or_part_number: "See summary",
+              role_in_circuit: item,
+              confidence: "low"
+            });
+          }
+        }
+      });
+
+      return data;
+    }
+
+    // Pull the answer out of the Gemini response, skipping "thought" parts
+    function extractDataFromResponse(jsonResponse) {
+      const candidate = jsonResponse?.candidates?.[0];
+      const parts = candidate?.content?.parts || [];
+      if (!parts.length) {
+        throw new Error(
+          "No response content received from model." +
+            (candidate?.finishReason ? " Finish reason: " + candidate.finishReason : "")
+        );
+      }
+
+      const nonThoughtParts = parts.filter((p) => !p.thought && p.text);
+      const targetParts = nonThoughtParts.length > 0 ? nonThoughtParts : parts;
+
+      // 1. Last part first (final answer usually comes last)
+      for (let i = targetParts.length - 1; i >= 0; i--) {
+        const parsed = tryParseJson(targetParts[i].text);
+        if (parsed) return parsed;
+      }
+
+      // 2. All parts joined
+      const combined = targetParts.map((p) => p.text).join("\n");
+      const parsedCombined = tryParseJson(combined);
+      if (parsedCombined) return parsedCombined;
+
+      // 3. Approximate fallback
+      return buildFallbackFromText(combined || parts[0]?.text || "");
+    }
+
+    // Send the image to OUR server, which calls Gemini with the secret key
+    async function callBackend(base64Data, inputType) {
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image: base64Data,
+          mimeType: "image/jpeg",
+          inputType: inputType
+        })
+      });
+
+      if (!res.ok) {
+        let errDetails = `HTTP ${res.status} ${res.statusText}`;
+        try {
+          const errJson = await res.json();
+          if (errJson.error && errJson.error.message) {
+            errDetails = errJson.error.message;
+          }
+        } catch (_) {}
+        throw new Error(errDetails);
+      }
+
+      const jsonResponse = await res.json();
+      console.log("Model response:", jsonResponse); // handy for debugging (F12)
+      return extractDataFromResponse(jsonResponse);
+    }
+
+    function renderResults(data) {
+      lastAnalysisData = data;
+
+      resCircuitType.textContent = data.circuit_type || "Unknown";
+      resImageType.textContent = data.image_type || "Unclear";
+
+      resConfidenceBadge.innerHTML = "";
+      resConfidenceBadge.appendChild(createConfidenceBadge(data.overall_confidence));
+
+      resSummary.textContent = data.summary || "No summary provided.";
+
+      resComponentsBody.innerHTML = "";
+      if (Array.isArray(data.components) && data.components.length > 0) {
+        data.components.forEach((c) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td style="font-weight: 600;">${escapeHtml(c.name || "Unknown")}</td>
+            <td>${escapeHtml(String(c.quantity || 1))}</td>
+            <td><code>${escapeHtml(c.value_or_part_number || "Unspecified")}</code></td>
+            <td>${escapeHtml(c.role_in_circuit || "-")}</td>
+            <td></td>
+          `;
+          tr.querySelector("td:last-child").appendChild(createConfidenceBadge(c.confidence));
+          resComponentsBody.appendChild(tr);
+        });
+      } else {
+        resComponentsBody.innerHTML = `<tr><td colspan="5" class="empty-msg">No individual components detected.</td></tr>`;
+      }
+
+      populateList(resConnectionsList, data.connections, "No key connections detected.");
+      populateList(resProblemsList, data.possible_problems, "No obvious circuit flaws or hazards detected.");
+      populateList(resChecksList, data.what_to_check, "No specific manual checks required.");
+
+      resultsArea.style.display = "flex";
+      resultsArea.scrollIntoView({ behavior: "smooth" });
+    }
+
+    function populateList(element, items, emptyMessage) {
+      element.innerHTML = "";
+      if (Array.isArray(items) && items.length > 0) {
+        items.forEach((item) => {
+          const li = document.createElement("li");
+          li.textContent = item;
+          element.appendChild(li);
+        });
+      } else {
+        const li = document.createElement("li");
+        li.className = "empty-msg";
+        li.textContent = emptyMessage;
+        element.appendChild(li);
+      }
+    }
+
+    copyBtn.addEventListener("click", () => {
+      if (!lastAnalysisData) return;
+      const text = formatDataForClipboard(lastAnalysisData);
+      navigator.clipboard.writeText(text).then(() => {
+        const orig = copyBtn.textContent;
+        copyBtn.textContent = "✓ Copied!";
+        setTimeout(() => (copyBtn.textContent = orig), 2000);
+      });
+    });
+
+    function formatDataForClipboard(d) {
+      let out = `CIRCUITLENS ANALYSIS REPORT\n`;
+      out += `==========================\n`;
+      out += `Type: ${d.circuit_type || "Unknown"} (${d.image_type || "Unclear"})\n`;
+      out += `Confidence: ${d.overall_confidence || "medium"}\n\n`;
+      out += `SUMMARY:\n${d.summary || ""}\n\n`;
+
+      out += `COMPONENTS:\n`;
+      (d.components || []).forEach((c) => {
+        out += `- ${c.name} (x${c.quantity || 1}): ${c.value_or_part_number || "N/A"} - Role: ${c.role_in_circuit || "N/A"} [${c.confidence || "med"}]\n`;
+      });
+
+      out += `\nKEY CONNECTIONS:\n`;
+      (d.connections || []).forEach((c) => (out += `- ${c}\n`));
+
+      out += `\nPOSSIBLE PROBLEMS / SAFETY:\n`;
+      (d.possible_problems || []).forEach((p) => (out += `! ${p}\n`));
+
+      out += `\nMANUAL CHECKS RECOMMENDED:\n`;
+      (d.what_to_check || []).forEach((k) => (out += `? ${k}\n`));
+
+      return out;
+    }
+
+    function showError(msg) {
+      errorStatus.innerHTML = `<strong>Error:</strong> ${escapeHtml(msg)}`;
+      errorStatus.style.display = "block";
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/[&<>"']/g, (m) => {
+        return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m];
+      });
+    }
+  </script>
+</body>
+</html>
